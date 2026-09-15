@@ -1,76 +1,123 @@
-Markdown
 # Soccer Agents ML
 
-Multi-agent reinforcement learning environment built in Unity using ML-Agents and MA-POCA (Multi-Agent Post-Processing Curriculum Assessment).
+2v2 multi-agent reinforcement learning environment built in Unity with ML-Agents, MA-POCA (MultiAgent POsthumous Credit Assignment), and self-play.
 
-Agents learn competitive 2v2 soccer dynamics using continuous controls, multi-agent group rewards, and spatial shaping signals to prevent swarming and encourage tactical positioning.
+Agents are trained with continuous movement controls, team rewards, and limited reward shaping.
 
-## Project Structure
+## Environment
 
-* **`Assets/Scripts/SoccerAgent.cs`**: Agent class handling observations, continuous physics controls, and individual proximity rewards.
-* **`Assets/Scripts/SoccerEnvController.cs`**: Environment manager tracking match state, goal triggers, timer resets, and team-level group rewards via `SimpleMultiAgentGroup`.
-* **`Assets/Prefabs/`**: Pre-configured environment prefab containing pitch geometry, goal triggers, and agent spawn points.
-* **`config.yaml`**: PPO/MA-POCA training hyperparameters for ML-Agents.
+The values below reflect the current `TrainingEnvironment.prefab`.
 
-## Environment Specifications
+- 2 teams with 2 agents each
+- 29-value vector observation space
+- 2 continuous actions
+- Decision period of 5 `FixedUpdate` steps
+- 210-second episode limit
+- Randomized ball and agent spawn offsets
 
-* **Vector Observation Space**: 28 floats
-  * Ball position (relative, normalized) and linear velocity
-  * Relative offsets to own goal and opponent goal
-  * Agent linear velocity and forward vector
-  * Relative positions of teammates and opponents
-  * Pitch bounds normalized coordinates
-* **Action Space**: Continuous (Size: 2)
-  * `Actions[0]`: Lateral movement force (X-axis)
-  * `Actions[1]`: Forward/Backward movement force (Z-axis)
-* **Decision Frequency**: Every 5 FixedUpdate steps
+Each agent observes the ball state, both goals, its own motion and orientation, its teammate, both opponents, and the ball's normalized position on the pitch.
 
-## Setup & Installation
+The policy outputs lateral and forward/backward movement. Movement is applied through the agent Rigidbody rather than direct transform movement.
 
-### Requirements
+## Rewards
 
-* Unity 2022.3 LTS or newer
-* Python 3.10.x
-* ML-Agents Python Package (`mlagents >= 0.30.0`)
-* PyTorch
+Goal rewards are assigned through `SimpleMultiAgentGroup`:
 
-### Environment Setup
+```text
+Goal scored:    +4
+Goal conceded:  -4
+```
 
-1. Clone the repository:
-   ```bash
-   git clone [https://github.com/DanielJDeng1/Soccer-Agents-ML.git](https://github.com/DanielJDeng1/Soccer-Agents-ML.git)
-   cd Soccer-Agents-ML
-Create and activate a Python virtual environment:
+Additional shaping includes:
 
-Bash
-python -m venv ml_env
-.\ml_env\Scripts\Activate.ps1
-Install required Python packages:
+- team reward for advancing the ball toward the opposing goal
+- approach reward for the teammate closest to the ball
+- penalty when teammates crowd the ball
+- small per-step penalty
 
-Bash
-pip install mlagents torch
-Training
-Open the project in Unity Editor and load Assets/Scenes/TestScene.unity.
+## Training
 
-Open your terminal, activate ml_env, and run:
+Training is configured in [`config.yaml`](config.yaml) with the POCA trainer and self-play.
 
-Bash
-mlagents-learn config.yaml --run-id=soccer_mapoca_v1 --force
-When the terminal prompts Listening on port 5004, press Play in Unity.
+```yaml
+trainer_type: poca
+batch_size: 2048
+buffer_size: 20480
+learning_rate: 0.0003
+hidden_units: 512
+num_layers: 2
+max_steps: 10000000
+```
 
-TensorBoard metrics log automatically to the ./results folder. View training progress by running:
+Self-play snapshots and opponent swaps are configured every 20,000 steps.
 
-Bash
+## Metrics
+
+`SoccerEnvController` records the following through ML-Agents `StatsRecorder`:
+
+- goals per episode
+- episodes ending in a goal
+- ball touches
+- completed passes
+- interceptions
+
+These are available in TensorBoard with the standard ML-Agents training metrics.
+
+## Files
+
+- `Assets/Scripts/SoccerAgent.cs` — observations, movement, and per-agent reward shaping
+- `Assets/Scripts/SoccerEnvController.cs` — team groups, scoring, resets, and training metrics
+- `Assets/Prefabs/TrainingEnvironment.prefab` — serialized environment and agent settings
+- `config.yaml` — POCA and self-play training configuration
+
+## Setup
+
+Current project versions:
+
+```text
+Unity:                 6000.3.16f1
+com.unity.ml-agents:   4.1.0
+Python:                3.10.12
+mlagents:              1.1.0
+```
+
+The commands below use Windows PowerShell.
+
+Clone the repository:
+
+```powershell
+git clone https://github.com/DanielJDeng1/Soccer-Agents-ML.git
+cd Soccer-Agents-ML
+```
+
+Create and activate a Python environment:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install mlagents==1.1.0
+```
+
+Open `Assets/Scenes/TestScene.unity` in Unity.
+
+Start the trainer:
+
+```powershell
+mlagents-learn config.yaml --run-id=soccer_mapoca_v1
+```
+
+Press Play in Unity after the trainer begins listening.
+
+## TensorBoard
+
+```powershell
 tensorboard --logdir=results
-Inference
-To run trained policies in Unity:
+```
 
-Locate the generated .onnx file in results/soccer_mapoca_v1/.
+## Inference
 
-Drag the .onnx file into Assets/ML-Agents/.
+After training, import the generated `.onnx` model from `results/<run-id>/` into Unity and assign it to the agents' `Behavior Parameters` component.
 
-Select the agent GameObjects in your scene prefab.
+Set `Behavior Type` to `Inference Only` or `Default` to run the trained policy.
 
-Drag the .onnx model asset into the Model field of the Behavior Parameters component.
-
-Set Behavior Type to Inference Only or Default.
