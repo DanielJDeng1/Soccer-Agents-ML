@@ -65,14 +65,14 @@ These are available in TensorBoard with the standard ML-Agents training metrics.
 
 ## Optional Loophole telemetry (experimental)
 
-The existing TensorBoard stats remain unchanged. For offline reward-exploit analysis, an **opt-in** \`SoccerTraceRecorder\` component can export agent positions, ball positions, individual shaped-reward contributions, team-reward contributions, and episode outcomes.
+The existing TensorBoard stats remain unchanged. For offline reward-exploit analysis, an **opt-in** `SoccerTraceRecorder` component can export agent positions, ball positions, individual shaped-reward contributions, team-reward contributions, and episode outcomes.
 
-1. In Unity, add \`SoccerTraceRecorder\` to the same GameObject as \`SoccerEnvController\`.
+1. In Unity, add `SoccerTraceRecorder` to the same GameObject as `SoccerEnvController`.
 2. Check **Capture Enabled** on the recorder. The default is **off** so ordinary training is unaffected.
-3. Run an episode. The CSV is written under \`Application.persistentDataPath/Loophole/\`.
-4. Use the \`episode\` and \`time_s\` columns to align reward events with sampled player and ball positions. \`sampleEveryFixedSteps\` controls the optional position sampling interval.
+3. Run an episode. The CSV is written under `Application.persistentDataPath/Loophole/`.
+4. Use the `episode` and `time_s` columns to align reward events with sampled player and ball positions. `sampleEveryFixedSteps` controls the optional position sampling interval.
 
-The CSV event types are \`position\`, \`reward\`, and \`outcome\`. Reward rows identify the term (\`step_penalty\`, \`ball_approach\`, \`teammate_crowding\`, \`ball_advance\`, \`goal_scored\`, or \`goal_conceded\`). Outcome rows provide episode-level goal, touch, pass, and interception counts. Individual agent positions are sampled; reward events are recorded at the point they are applied. The trace does **not** include video recordings, checkpoint identifiers, or a validated reward-hacking detector.
+The CSV event types are `position`, `reward`, and `outcome`. Reward rows identify the term (`step_penalty`, `ball_approach`, `teammate_crowding`, `ball_advance`, `goal_scored`, or `goal_conceded`). Outcome rows provide episode-level goal, touch, pass, and interception counts. Individual agent positions are sampled; reward events are recorded at the point they are applied. The trace does **not** include video recordings, checkpoint identifiers, or a validated reward-hacking detector.
 
 This is a proposed instrumentation addition, not a finished Loophole implementation. It still needs compilation, scene verification, and a smoke test in Unity 6000.3.16f1 before use in an experiment.
 
