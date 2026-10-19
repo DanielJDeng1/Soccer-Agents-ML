@@ -71,6 +71,8 @@ public class SoccerEnvController : MonoBehaviour
     private int passesCompletedInEpisode;
     private int interceptionsInEpisode;
     private StatsRecorder statsRecorder;
+    private SoccerTraceRecorder traceRecorder;
+    private int traceEpisode;
 
     private void Awake()
     {
@@ -88,6 +90,7 @@ public class SoccerEnvController : MonoBehaviour
         foreach (var agent in teamRed) if (agent != null) redGroup.RegisterAgent(agent);
 
         statsRecorder = Academy.Instance.StatsRecorder;
+        traceRecorder = GetComponent<SoccerTraceRecorder>();
 
         referencesValid = ValidateReferences();
     }
@@ -144,6 +147,8 @@ public class SoccerEnvController : MonoBehaviour
         }
 
         ApplyBallAdvanceGroupReward();
+        if (traceRecorder != null)
+            traceRecorder.RecordPositions(traceEpisode, episodeTimer, ball.position, teamBlue, teamRed);
     }
 
     // distribute delta distance rewards through MA-POCA group channels to maintain proper credit assignment.
@@ -154,14 +159,31 @@ public class SoccerEnvController : MonoBehaviour
         float currentToRed = Vector3.Distance(ball.position, redGoal.position);
         float blueDelta = previousBallToRedGoalDistance - currentToRed;
         float blueReward = Mathf.Clamp(blueDelta * ballAdvanceShapingScale, -maxBallAdvanceRewardPerStep, maxBallAdvanceRewardPerStep);
-        if (blueReward != 0f) blueGroup.AddGroupReward(blueReward);
+        if (blueReward != 0f)
+        {
+            blueGroup.AddGroupReward(blueReward);
+            if (traceRecorder != null)
+                traceRecorder.RecordTeamReward(traceEpisode, episodeTimer, Team.Blue, "ball_advance", blueReward, ball.position);
+        }
         previousBallToRedGoalDistance = currentToRed;
 
         float currentToBlue = Vector3.Distance(ball.position, blueGoal.position);
         float redDelta = previousBallToBlueGoalDistance - currentToBlue;
         float redReward = Mathf.Clamp(redDelta * ballAdvanceShapingScale, -maxBallAdvanceRewardPerStep, maxBallAdvanceRewardPerStep);
-        if (redReward != 0f) redGroup.AddGroupReward(redReward);
+        if (redReward != 0f)
+        {
+            redGroup.AddGroupReward(redReward);
+            if (traceRecorder != null)
+                traceRecorder.RecordTeamReward(traceEpisode, episodeTimer, Team.Red, "ball_advance", redReward, ball.position);
+        }
         previousBallToBlueGoalDistance = currentToBlue;
+    }
+
+    // Reward telemetry is strictly optional and never changes training rewards.
+    public void TraceAgentReward(SoccerAgent agent, string term, float value)
+    {
+        if (traceRecorder != null && traceRecorder.IsRecording && ball != null)
+            traceRecorder.RecordAgentReward(traceEpisode, episodeTimer, agent, term, value, ball.position);
     }
 
     public void RegisterTouch(SoccerAgent agent)
@@ -188,12 +210,23 @@ public class SoccerEnvController : MonoBehaviour
 
         scoringGroup.AddGroupReward(goalScoredReward);
         concedingGroup.AddGroupReward(goalConcededReward);
+        if (traceRecorder != null && traceRecorder.IsRecording)
+        {
+            traceRecorder.RecordTeamReward(traceEpisode, episodeTimer, scoringTeam, "goal_scored", goalScoredReward, ball.position);
+            traceRecorder.RecordTeamReward(traceEpisode, episodeTimer,
+                scoringTeam == Team.Blue ? Team.Red : Team.Blue, "goal_conceded", goalConcededReward, ball.position);
+        }
 
         ResetEnv();
     }
 
     public void ResetEnv()
     {
+        if (traceRecorder != null)
+            traceRecorder.RecordEpisodeEnd(traceEpisode, episodeTimer, totalGoalsInEpisode,
+                ballTouchesInEpisode, passesCompletedInEpisode, interceptionsInEpisode, ball.position);
+        traceEpisode++;
+
         if (statsRecorder != null)
         {
             statsRecorder.Add("Environment/GoalsPerEpisode", totalGoalsInEpisode, StatAggregationMethod.Average);
