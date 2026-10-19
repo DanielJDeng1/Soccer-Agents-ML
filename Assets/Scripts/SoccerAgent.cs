@@ -137,6 +137,7 @@ public class SoccerAgent : Agent
         if (!referencesValid) return;
 
         AddReward(existencePenalty);
+        if (envController != null) envController.TraceAgentReward(this, "step_penalty", existencePenalty);
         ApplyBallApproachShaping();
         ApplyTeammateCrowdingPenalty();
 
@@ -192,6 +193,7 @@ public class SoccerAgent : Agent
             float delta = previousDistanceToBall - currentDistance;
             float reward = Mathf.Clamp(delta * ballApproachShapingScale, -maxBallApproachRewardPerStep, maxBallApproachRewardPerStep);
             AddReward(reward);
+            if (envController != null) envController.TraceAgentReward(this, "ball_approach", reward);
         }
 
         previousDistanceToBall = currentDistance;
@@ -212,6 +214,7 @@ public class SoccerAgent : Agent
             if (Vector3.Distance(teammate.position, ball.position) <= teammateCrowdingRadius)
             {
                 AddReward(teammateCrowdingPenalty);
+                if (envController != null) envController.TraceAgentReward(this, "teammate_crowding", teammateCrowdingPenalty);
                 return; // early exit once crowding condition is met
             }
         }
